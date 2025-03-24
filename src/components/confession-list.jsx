@@ -57,7 +57,7 @@ export default function ConfessionList({ confessions, socket, addToast }) {
         </>
       ) : (
         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          Loading Confessions... It may take some time First time because server needs to wake up. Since I am using free Version, Server goes to sleep due to inactivity. It will be back in no while.
+          Loading Confessions... It may take a while First time because server needs to wake up. Since I am using free Version, API Server goes to sleep due to inactivity. It will be back in no while.
         </div>
       )}
 
