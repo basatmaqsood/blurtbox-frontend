@@ -1,3 +1,4 @@
+'use client'
 import { useEffect, useState } from "react";
 import ConfessionList from "../components/confession-list";
 import AddConfession from "../components/add-confession";
