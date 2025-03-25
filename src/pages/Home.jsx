@@ -62,7 +62,7 @@ export default function Home() {
   useEffect(() => {
     // Connect to socket
     const socketInstance = io(
-      "https://calm-randy-xetawise-6e7e5bc2.koyeb.app/"
+      "https://calm-randy-xetawise-6e7e5bc2.koyeb.app"
     );
     setSocket(socketInstance);
 

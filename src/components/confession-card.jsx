@@ -15,6 +15,11 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [commentError, setCommentError] = useState("")
   const commentInputRef = useRef(null)
+  // New state for reply functionality
+  const [replyingTo, setReplyingTo] = useState(null) // { commentIndex: number, text: string }
+  const [newReply, setNewReply] = useState("")
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const replyInputRef = useRef(null)
 
   useEffect(() => {
     // Update comments when confession updates
@@ -36,6 +41,39 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
         }
       }
 
+      // Listen for new replies
+      const handleNewReply = ({ confessionId, commentIndex, reply }) => {
+        if (confessionId === confession._id) {
+          setComments((prevComments) => {
+            // Make a deep copy of the comments array
+            const updatedComments = [...prevComments]
+            // Ensure the comment at the index exists and has a replies array
+            if (updatedComments[commentIndex]) {
+              if (!updatedComments[commentIndex].replies) {
+                updatedComments[commentIndex].replies = []
+              }
+              // Check if the reply already exists to avoid duplicates
+              const replyExists = updatedComments[commentIndex].replies.some(
+                (existingReply) =>
+                  existingReply._id === reply._id ||
+                  (existingReply.text === reply.text && existingReply.createdAt === reply.createdAt),
+              )
+              if (!replyExists) {
+                updatedComments[commentIndex].replies.push(reply)
+              }
+            }
+            return updatedComments
+          })
+
+          // If this was our own reply submission, reset the form
+          if (isSubmittingReply && replyingTo?.commentIndex === commentIndex) {
+            setIsSubmittingReply(false)
+            setReplyingTo(null)
+            setNewReply("")
+          }
+        }
+      }
+
       // Listen for error messages
       const handleErrorMessage = (data) => {
         // Check if this is related to our current comment submission
@@ -47,18 +85,28 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
           if (addToast) {
             addToast("Comment Error", data.message, "error")
           }
+        } else if (isSubmittingReply) {
+          setCommentError(data.message)
+          setIsSubmittingReply(false)
+
+          // Also show toast if available
+          if (addToast) {
+            addToast("Reply Error", data.message, "error")
+          }
         }
       }
 
       socket.on("newComment", handleNewComment)
+      socket.on("newReply", handleNewReply)
       socket.on("errorMessage", handleErrorMessage)
 
       return () => {
         socket.off("newComment", handleNewComment)
+        socket.off("newReply", handleNewReply)
         socket.off("errorMessage", handleErrorMessage)
       }
     }
-  }, [confession._id, socket, isSubmitting, addToast])
+  }, [confession._id, socket, isSubmitting, isSubmittingReply, replyingTo, addToast])
 
   const updateLocalStorage = (newVoteState) => {
     const storedVotes = JSON.parse(localStorage.getItem("confessionVotes")) || {}
@@ -119,6 +167,12 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
     return new Date(dateString).toLocaleDateString(undefined, options)
   }
 
+  // Format time
+  const formatTime = (dateString) => {
+    const options = { hour: "2-digit", minute: "2-digit" }
+    return new Date(dateString).toLocaleTimeString(undefined, options)
+  }
+
   // Handle comment submission
   const handleSubmitComment = async (e) => {
     e.preventDefault()
@@ -169,6 +223,71 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
       setCommentError(error.message || "Failed to add comment")
       setIsSubmitting(false)
     }
+  }
+
+  // Handle reply submission
+  const handleSubmitReply = async (e) => {
+    e.preventDefault()
+
+    if (!newReply.trim() || isSubmittingReply || !socket || replyingTo === null) return
+
+    // Clear any previous errors
+    setCommentError("")
+    setIsSubmittingReply(true)
+
+    try {
+      // Send reply via socket
+      socket.emit(
+        "addReply",
+        {
+          confessionId: confession._id,
+          commentIndex: replyingTo.commentIndex,
+          text: newReply,
+        },
+        (response) => {
+          if (response?.error) {
+            setCommentError(response.error)
+            setIsSubmittingReply(false)
+
+            // Also show toast if available
+            if (addToast) {
+              addToast("Reply Error", response.error, "error")
+            }
+          }
+        },
+      )
+
+      // Don't clear the input yet - wait for the socket response
+      // The socket event handler will clear it on success
+    } catch (error) {
+      console.error("Error adding reply:", error)
+      setCommentError(error.message || "Failed to submit reply")
+      setIsSubmittingReply(false)
+
+      // Also show toast if available
+      if (addToast) {
+        addToast("Reply Error", error.message || "Failed to submit reply", "error")
+      }
+    }
+  }
+
+  // Start replying to a comment
+  const startReply = (commentIndex, commentText) => {
+    setReplyingTo({ commentIndex, text: commentText })
+    setNewReply("")
+
+    // Focus on reply input after it renders
+    setTimeout(() => {
+      if (replyInputRef.current) {
+        replyInputRef.current.focus()
+      }
+    }, 100)
+  }
+
+  // Cancel replying
+  const cancelReply = () => {
+    setReplyingTo(null)
+    setNewReply("")
   }
 
   // Toggle comments visibility
@@ -324,11 +443,151 @@ export default function ConfessionCard({ confession, socket, onReportClick, addT
           <h4 className="text-sm font-medium mb-3">Comments</h4>
 
           {/* Comments list */}
-          <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+          <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
             {comments.length > 0 ? (
-              comments.map((comment) => (
-                <div key={comment._id} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md">
-                  <p className="text-sm text-gray-800 dark:text-gray-200">{comment.text}</p>
+              comments.map((comment, commentIndex) => (
+                <div
+                  key={comment._id || commentIndex}
+                  className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden"
+                >
+                  {/* Main comment */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-3">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 mb-1">{comment.text}</p>
+                    <div className="flex justify-between items-center">
+                      {comment.createdAt && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatDate(comment.createdAt)} {formatTime(comment.createdAt)}
+                        </p>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startReply(commentIndex, comment.text)
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Replies section */}
+                  {comment.replies && comment.replies.length > 0 && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                      {comment.replies.map((reply, replyIndex) => (
+                        <div key={reply._id || replyIndex} className="p-2 pl-5 bg-white dark:bg-gray-800">
+                          <div className="flex items-start space-x-2">
+                            <div className="h-full pt-1">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-gray-400"
+                              >
+                                <polyline points="9 14 4 9 9 4"></polyline>
+                                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs text-gray-800 dark:text-gray-200">{reply.text}</p>
+                              {reply.createdAt && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {formatDate(reply.createdAt)} {formatTime(reply.createdAt)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Reply form - shown only when replying to this specific comment */}
+                  {replyingTo && replyingTo.commentIndex === commentIndex && (
+                    <div className="p-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleSubmitReply(e)
+                        }}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="mr-1"
+                          >
+                            <polyline points="9 14 4 9 9 4"></polyline>
+                            <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                          </svg>
+                          <span>Replying</span>
+                        </div>
+
+                        <div className="flex gap-1">
+                          <input
+                            ref={replyInputRef}
+                            type="text"
+                            value={newReply}
+                            onChange={(e) => {
+                              setNewReply(e.target.value)
+                              if (commentError) setCommentError("")
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Write a reply..."
+                            className={`flex-1 px-2 py-1 text-xs border rounded-md bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                              commentError
+                                ? "border-red-500 dark:border-red-700"
+                                : "border-gray-300 dark:border-gray-600"
+                            }`}
+                            maxLength={150}
+                          />
+                          <div className="flex">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                cancelReply()
+                              }}
+                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-l-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={!newReply.trim() || isSubmittingReply}
+                              className={`px-2 py-1 bg-purple-600 text-white text-xs rounded-r-md hover:bg-purple-700 transition-colors ${
+                                !newReply.trim() || isSubmittingReply
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : "cursor-pointer"
+                              }`}
+                            >
+                              {isSubmittingReply ? "..." : "Reply"}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-end text-xs text-gray-500 dark:text-gray-400">
+                          <span>{newReply.length}/150</span>
+                        </div>
+                      </form>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
