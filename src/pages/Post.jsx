@@ -796,7 +796,8 @@ function Post() {
                           </span>
                         </div>
 
-                        <div className="flex gap-2">
+                        {/* Mobile-responsive reply form */}
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             ref={replyInputRef}
                             type="text"
@@ -813,25 +814,25 @@ function Post() {
                               }
                             }}
                             placeholder="Write a reply..."
-                            className={`flex-1 px-3 py-2 text-sm border rounded-md bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            className={`flex-1 px-3 py-2 text-sm border rounded-md sm:rounded-r-none bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                               commentError
                                 ? "border-red-500 dark:border-red-700"
                                 : "border-gray-300 dark:border-gray-600"
                             }`}
                             maxLength={150}
                           />
-                          <div className="flex">
+                          <div className="flex w-full sm:w-auto">
                             <button
                               type="button"
                               onClick={cancelReply}
-                              className="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-l-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-l-md sm:rounded-l-none rounded-r-none hover:bg-gray-100 dark:hover:bg-gray-700"
                             >
                               Cancel
                             </button>
                             <button
                               type="submit"
                               disabled={!newReply.trim() || isSubmittingReply}
-                              className={`px-3 py-2 bg-purple-600 text-white text-sm rounded-r-md hover:bg-purple-700 transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 py-2 bg-purple-600 text-white text-sm rounded-r-md hover:bg-purple-700 transition-colors ${
                                 !newReply.trim() || isSubmittingReply ? "opacity-50 cursor-not-allowed" : ""
                               }`}
                             >
@@ -898,4 +899,3 @@ function Post() {
 }
 
 export default Post
-
