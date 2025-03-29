@@ -28,7 +28,7 @@ function Post() {
 
   // Connect to socket
   useEffect(() => {
-    const socketInstance = io(`https://calm-randy-xetawise-6e7e5bc2.koyeb.app`)
+    const socketInstance = io(`http://api-blurtbox.basatmaqsood.com/`)
     setSocket(socketInstance)
 
     return () => {
@@ -41,7 +41,7 @@ function Post() {
     setLoading(true)
     setError(null)
 
-    fetch(`https://calm-randy-xetawise-6e7e5bc2.koyeb.app/api/confessions/${id}`)
+    fetch(`http://api-blurtbox.basatmaqsood.com/api/confessions/${id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to load confession")
