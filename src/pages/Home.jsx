@@ -62,7 +62,7 @@ export default function Home() {
   useEffect(() => {
     // Connect to socket
     const socketInstance = io(
-      "http://api-blurtbox.basatmaqsood.com/"
+      "https://api-blurtbox.basatmaqsood.com/"
     );
     setSocket(socketInstance);
 
@@ -118,7 +118,7 @@ export default function Home() {
   const fetchConfessions = async () => {
     try {
       const response = await fetch(
-        "http://api-blurtbox.basatmaqsood.com/api/confessions"
+        "https://api-blurtbox.basatmaqsood.com/api/confessions"
       );
       const data = await response.json();
       setConfessions(data);
@@ -142,7 +142,7 @@ export default function Home() {
   const fetchTopConfessions = async () => {
     try {
       const response = await fetch(
-        "http://api-blurtbox.basatmaqsood.com/api/confessions/top-upvoted"
+        "https://api-blurtbox.basatmaqsood.com/api/confessions/top-upvoted"
       );
       const data = await response.json();
       setTopConfessions(data);
